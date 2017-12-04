@@ -17,53 +17,52 @@
 #define GREEN_LED BIT6
 
 
-AbRect rect10 = {abRectGetBounds, abRectCheck, {10,10}}; /**< 10x10 rectangle */
-AbRArrow rightArrow = {abRArrowGetBounds, abRArrowCheck, 30};
+AbRect net = {abRectGetBounds, abRectCheck, {screenWidth, 0.5}};
+AbRectOutline paddle = {abRectOutlineGetBounds, abRectOutlineCheck, {15, 2}};
+AbRectOutline paddleCPU = {abRectOutlineGetBounds, abRectOutlineCheck, {15, 2}};
 
 AbRectOutline fieldOutline = {	/* playing field */
   abRectOutlineGetBounds, abRectOutlineCheck,   
-  {screenWidth/2 - 10, screenHeight/2 - 10}
+  {screenWidth/2 - 0.5, screenHeight/2 - 0.5}
 };
-
-Layer layer4 = {
-  (AbShape *)&rightArrow,
-  {(screenWidth/2)+10, (screenHeight/2)+5}, /**< bit below & right of center */
-  {0,0}, {0,0},				    /* last & next pos */
-  COLOR_PINK,
-  0
-};
-  
-
-Layer layer3 = {		/**< Layer with an orange circle */
-  (AbShape *)&circle8,
-  {(screenWidth/2)+10, (screenHeight/2)+5}, /**< bit below & right of center */
-  {0,0}, {0,0},				    /* last & next pos */
-  COLOR_VIOLET,
-  &layer4,
-};
-
 
 Layer fieldLayer = {		/* playing field as a layer */
   (AbShape *) &fieldOutline,
   {screenWidth/2, screenHeight/2},/**< center */
   {0,0}, {0,0},				    /* last & next pos */
   COLOR_BLACK,
-  &layer3
+  0
 };
 
-Layer layer1 = {		/**< Layer with a red square */
-  (AbShape *)&rect10,
-  {screenWidth/2, screenHeight/2}, /**< center */
+Layer layer3 = {		/**< Layer with user paddle */
+  (AbShape *)&net,
+  {screenWidth , screenHeight/2}, /**< center */
   {0,0}, {0,0},				    /* last & next pos */
-  COLOR_RED,
+  COLOR_BLACK,
   &fieldLayer,
 };
 
-Layer layer0 = {		/**< Layer with an orange circle */
-  (AbShape *)&circle14,
+Layer layer2 = {		/**< Layer with user paddle */
+  (AbShape *)&paddle,
+  {screenWidth/2 , screenHeight/2 + 75}, /**< center */
+  {0,0}, {0,0},				    /* last & next pos */
+  COLOR_ROYAL_BLUE,
+  &layer3,
+};
+
+Layer layer1 = {		/**< Layer with CPU paddle */
+  (AbShape *)&paddleCPU,
+  {screenWidth/2, screenHeight/2 - 75}, /**< center */
+  {0,0}, {0,0},				    /* last & next pos */
+  COLOR_RED,
+  &layer2,
+};
+
+Layer layer0 = {		/**< Layer with the ball */
+  (AbShape *)&circle4,
   {(screenWidth/2)+10, (screenHeight/2)+5}, /**< bit below & right of center */
   {0,0}, {0,0},				    /* last & next pos */
-  COLOR_ORANGE,
+  COLOR_BLACK,
   &layer1,
 };
 
@@ -78,9 +77,13 @@ typedef struct MovLayer_s {
 } MovLayer;
 
 /* initial value of {0,0} will be overwritten */
-MovLayer ml3 = { &layer3, {1,1}, 0 }; /**< not all layers move */
-MovLayer ml1 = { &layer1, {1,2}, &ml3 }; 
-MovLayer ml0 = { &layer0, {2,1}, &ml1 }; 
+
+
+MovLayer ml2 = { &layer2, {2,0}, 0 };
+MovLayer ml1 = { &layer1, {2,0}, &ml2 };
+
+MovLayer ml0 = { &layer0, {2,1}, 0 }; 
+
 
 void movLayerDraw(MovLayer *movLayers, Layer *layers)
 {
@@ -133,6 +136,29 @@ void mlAdvance(MovLayer *ml, Region *fence)
   Vec2 newPos;
   u_char axis;
   Region shapeBoundary;
+  
+  
+  for (; ml; ml = ml->next) {
+    vec2Add(&newPos, &ml->layer->posNext, &ml->velocity);
+    abShapeGetBounds(ml->layer->abShape, &newPos, &shapeBoundary);
+    for (axis = 0; axis < 2; axis ++) {
+      if ((shapeBoundary.topLeft.axes[axis] < fence->topLeft.axes[axis]) ||
+	  (shapeBoundary.botRight.axes[axis] > fence->botRight.axes[axis]) ) {
+	int velocity = ml->velocity.axes[axis] = -ml->velocity.axes[axis];
+	newPos.axes[axis] += (2*velocity);
+      }	/**< if outside of fence */
+    } /**< for axis */
+    ml->layer->posNext = newPos;
+  } /**< for ml */
+}
+
+void mlAdvancePaddle(MovLayer *ml, Region *fence)
+{
+  Vec2 newPos;
+  u_char axis;
+  Region shapeBoundary;
+  
+  
   for (; ml; ml = ml->next) {
     vec2Add(&newPos, &ml->layer->posNext, &ml->velocity);
     abShapeGetBounds(ml->layer->abShape, &newPos, &shapeBoundary);
@@ -148,10 +174,11 @@ void mlAdvance(MovLayer *ml, Region *fence)
 }
 
 
-u_int bgColor = COLOR_BLUE;     /**< The background color */
+u_int bgColor = COLOR_WHITE;     /**< The background color */
 int redrawScreen = 1;           /**< Boolean for whether screen needs to be redrawn */
 
 Region fieldFence;		/**< fence around playing field  */
+Region paddleFence;
 
 
 /** Initializes everything, enables interrupts and green LED, 
@@ -166,14 +193,17 @@ void main()
   lcd_init();
   shapeInit();
   p2sw_init(1);
+  p2sw_init(2);
+  p2sw_init(3);
+  p2sw_init(4);
 
   shapeInit();
 
   layerInit(&layer0);
   layerDraw(&layer0);
-
-
+  
   layerGetBounds(&fieldLayer, &fieldFence);
+  layerGetBounds(&layer1, &paddleFence);
 
 
   enableWDTInterrupts();      /**< enable periodic interrupt */
@@ -198,7 +228,10 @@ void wdt_c_handler()
   P1OUT |= GREEN_LED;		      /**< Green LED on when cpu on */
   count ++;
   if (count == 15) {
+    
+    mlAdvancePaddle(&ml1, &fieldFence);
     mlAdvance(&ml0, &fieldFence);
+    
     if (p2sw_read())
       redrawScreen = 1;
     count = 0;

@@ -18,14 +18,42 @@ void main()
   u_char width = screenWidth, height = screenHeight;
 
   clearScreen(COLOR_BLUE);
-
+  
+    int x = 20;
+    int y = 40;
   drawString5x7(10,10, "switches:", COLOR_GREEN, COLOR_BLUE);
   while (1) {
     u_int switches = p2sw_read(), i;
     char str[5];
-    for (i = 0; i < 4; i++)
-      str[i] = (switches & (1<<i)) ? '-' : '0'+i;
+    for (i = 0; i < 4; i++){
+        if(i == 0){
+            str[i] = (switches & (1<<i)) ? '-' : '0'+i;
+            if(x > 0 && (switches & 1)){
+                x -= 10;
+            }
+        }
+        if(i == 1){
+            str[i] = (switches & (1<<i)) ? '-' : '1'+i;
+            if(x > screenWidth && (switches & 2)){
+                x += 10;
+            }
+        }
+        if(i == 2){
+            str[i] = (switches & (1<<i)) ? '-' : '2'+i;
+            if(y > 0 && (switches & 4)){
+                y += 10;
+            }
+        }
+        if(i == 3){
+            str[i] = (switches & (1<<i)) ? '-' : '3'+i;
+            if(y > screenHeight && (switches & 8)){
+                y -= 10;
+            }
+        }
+    }
+    
     str[4] = 0;
-    drawString5x7(20,20, str, COLOR_GREEN, COLOR_BLUE);
+    clearScreen(COLOR_BLUE);
+    drawString5x7(x,y, str, COLOR_GREEN, COLOR_BLUE);
   } 
 }
