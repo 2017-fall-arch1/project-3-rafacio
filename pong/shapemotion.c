@@ -13,8 +13,9 @@
 #include <p2switches.h>
 #include <shape.h>
 #include <abCircle.h>
-#include <p2switches.h>
 #include "buzzer.h"
+#include "switchStates.h"
+#include "switch.h"
 
 /**
  * 
@@ -141,7 +142,7 @@ void movLayerDraw(MovLayer *movLayers, Layer *layers)
  */
 void mlAdvance(MovLayer *ml, MovLayer *p1, MovLayer *p2, Region *fence)
 {
-    scoreBoard[1] = '|';
+    scoreBoard[1] = '-';
 	Vec2 newPos;
 	u_char axis;
 	Region shapeBoundary;
@@ -192,16 +193,7 @@ void mlAdvance(MovLayer *ml, MovLayer *p1, MovLayer *p2, Region *fence)
                 int velocity = ml->velocity.axes[axis] = -ml->velocity.axes[axis];
                     buzzer_set_period(500);
                     newPos.axes[axis] += (2*velocity);
-			} /**< for axis */
-			/*if((ml->layer->posNext.axes[1] >= 134) && (ml->layer->posNext.axes[0] <=  orange->layer->posNext.axes[0] + 18 && ml->layer->posNext.axes[0] >= orange->layer->posNext.axes[0] - 18)) {
-
-                int velocity = ml->velocity.axes[0] = -ml->velocity.axes[0];
-                velocity = ml->velocity.axes[1] = -ml->velocity.axes[1];
-                //ml->velocity.axes[0] += 1;
-                newPos.axes[axis] += (2*velocity);
-                //buzzer_set_period(1000);
-                int redrawScreen = 1;
-            }*/
+			}
 
             if (shapeBoundary.topLeft.axes[0] < fence->topLeft.axes[0]) {
 				newPos.axes[0] = screenWidth/2;
@@ -210,7 +202,7 @@ void mlAdvance(MovLayer *ml, MovLayer *p1, MovLayer *p2, Region *fence)
                 ml->layer->posNext = newPos;
                 p1Score++;
                 drawString5x7(3,5, "Player 1", COLOR_BLUE, COLOR_WHITE);
-                //buzzer_set_period(1000);
+                buzzer_set_period(1000);
                 int redrawScreen = 1;
                 break;
                 
@@ -223,7 +215,7 @@ void mlAdvance(MovLayer *ml, MovLayer *p1, MovLayer *p2, Region *fence)
                 ml->layer->posNext = newPos;
                 p2Score++;
                 drawString5x7(80,5, "Player 2", COLOR_BLUE, COLOR_WHITE);
-                //buzzer_set_period(1000);
+                buzzer_set_period(1000);
                 int redrawScreen = 1;
                 break;
 			}
@@ -246,33 +238,20 @@ void mlAdvance(MovLayer *ml, MovLayer *p1, MovLayer *p2, Region *fence)
     drawString5x7(80,5, "Player 2", COLOR_RED, COLOR_WHITE);
 }
 
-void p1Left(Layer *curLayers){
+void paddleUp(Layer *curLayers){
     Vec2 nextPos;
     Vec2 vel = {0,5};
     vec2Add(&nextPos, &curLayers->posNext, &vel);
     curLayers->posNext = nextPos;
 }
 
-void p1Right(Layer *curLayers){
+void paddleDown(Layer *curLayers){
     Vec2 nextPos;
     Vec2 vel ={0,-5};
     vec2Add(&nextPos, &curLayers->posNext, &vel);
     curLayers->posNext = nextPos;
 }
 
-void p2Left(Layer *curLayers){
-    Vec2 nextPos;
-    Vec2 vel = {0,5};
-    vec2Add(&nextPos, &curLayers->posNext, &vel);
-    curLayers->posNext = nextPos;
-}
-
-void p2Right(Layer *curLayers){
-    Vec2 nextPos;
-    Vec2 vel = {0,-5};
-    vec2Add(&nextPos, &curLayers->posNext, &vel);
-    curLayers->posNext = nextPos;
-}
 
 u_int bgColor = COLOR_WHITE;     /**< The background color */
 int redrawScreen = 1;           /**< Boolean for whether screen needs to be redrawn */
@@ -292,7 +271,7 @@ void main()
   buzzer_init();
   lcd_init();
   shapeInit();
-  p2sw_init(15);
+  p2sw_init(1);
 
   shapeInit();
 
@@ -330,14 +309,14 @@ void wdt_c_handler()
     
     mlAdvance(&ml0, &ml1, &ml2, &fieldFence);
     
-    if (p2sw_read() == 1)
-        p1Left(&layer1);
-    if (p2sw_read() == 2)
-        p1Right(&layer1);
-    if (p2sw_read() == 3)
-        p2Left(&layer2);
-    if (p2sw_read() == 4)
-        p2Right(&layer2);
+    if (switchStates() == 1)
+        paddleUp(&layer1);
+    if (switchStates() == 2)
+        paddleDown(&layer1);
+    if (switchStates() == 3)
+        paddleUp(&layer2);
+    if (switchStates() == 4)
+        paddleDown(&layer2);
     
     redrawScreen = 1;
     count = 0;
